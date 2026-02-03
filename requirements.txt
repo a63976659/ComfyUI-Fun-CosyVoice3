@@ -1,0 +1,8 @@
+torch
+torchaudio
+numpy
+modelscope
+hyperpyyaml
+onnxruntime
+# 核心库：CosyVoice (包含 funasr 依赖)
+git+https://github.com/FunAudioLLM/CosyVoice.git
