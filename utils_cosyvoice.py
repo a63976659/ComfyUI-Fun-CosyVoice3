@@ -1,9 +1,23 @@
 import os
+import sys
 import torch
 import gc
-import sys
 import folder_paths
 from huggingface_hub import snapshot_download as hf_snapshot_download
+
+# ================= 关键修改：添加本地路径 =================
+# 获取当前文件所在目录
+current_node_path = os.path.dirname(os.path.abspath(__file__))
+
+# 将当前插件目录加入系统路径，这样 Python 就能找到本地的 'cosyvoice' 文件夹
+if current_node_path not in sys.path:
+    sys.path.append(current_node_path)
+
+# 再次确认子目录是否需要加入 (有些环境比较严格)
+local_cosy_path = os.path.join(current_node_path, "cosyvoice")
+if os.path.exists(local_cosy_path) and current_node_path not in sys.path:
+    sys.path.append(current_node_path)
+# =======================================================
 
 # --- 尝试导入 ModelScope ---
 try:
@@ -13,15 +27,27 @@ except ImportError:
     HAS_MODELSCOPE = False
 
 # --- 尝试导入 CosyVoice ---
+HAS_COSYVOICE = False
 try:
-    from cosyvoice.cli.cosyvoice import AutoModel
+    # 优先尝试导入本地或系统安装的 cosyvoice
+    # 官方代码结构通常是 cosyvoice.cli.cosyvoice
+    from cosyvoice.cli.cosyvoice import CosyVoice
     HAS_COSYVOICE = True
-except ImportError:
-    HAS_COSYVOICE = False
+    print(f"[Fun-CosyVoice3] 成功加载 CosyVoice 库")
+except ImportError as e:
+    print(f"[Fun-CosyVoice3] 导入失败: {e}")
+    # 尝试另一种常见的导入路径 (兼容不同版本的源码结构)
+    try:
+        sys.path.append(os.path.join(current_node_path, "CosyVoice")) # 假如用户放的是大写文件夹
+        from cosyvoice.cli.cosyvoice import CosyVoice
+        HAS_COSYVOICE = True
+        print(f"[Fun-CosyVoice3] 通过备用路径成功加载 CosyVoice")
+    except Exception:
+        HAS_COSYVOICE = False
 
 # ================= 路径配置 =================
 
-COSY_MODELS_DIR = os.path.join(folder_paths.models_dir, "CosyVoice")
+COSY_MODELS_DIR = os.path.join(folder_paths.models_dir, "TTS")
 if not os.path.exists(COSY_MODELS_DIR):
     os.makedirs(COSY_MODELS_DIR)
 
@@ -49,10 +75,14 @@ def load_cosyvoice_model(model_name, device, auto_download=False, source="ModelS
     加载 CosyVoice 模型
     """
     if not HAS_COSYVOICE:
-        raise ImportError("Critical Dependency Missing: Please run 'pip install cosyvoice hyperpyyaml'")
+        raise ImportError(
+            "无法加载 'cosyvoice' 模块。\n"
+            "解决方法：\n"
+            "1. 请确保您已将 'cosyvoice' 文件夹复制到本插件目录中。\n"
+            "2. 或者确保 requirements.txt 中的依赖已安装成功。"
+        )
 
     # 1. 确定模型路径
-    # ModelScope ID: FunAudioLLM/Fun-CosyVoice3-0.5B-2512
     repo_id = "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
     target_folder_name = "Fun-CosyVoice3-0.5B-2512"
     
@@ -75,9 +105,8 @@ def load_cosyvoice_model(model_name, device, auto_download=False, source="ModelS
         torch.cuda.empty_cache()
         
         try:
-            # CosyVoice AutoModel 会自动处理 device，但通常需要我们确保环境正确
-            # 注意：CosyVoice3 这里的 device 处理可能封装在内部，我们主要负责路径
-            model = AutoModel(model_dir=model_path)
+            # 实例化模型
+            model = CosyVoice(model_dir=model_path, load_jit=False, load_onnx=False, load_trt=False)
             
             LOADED_COSY_MODELS[model_path] = model
             print("[CosyVoice] Model loaded successfully.")

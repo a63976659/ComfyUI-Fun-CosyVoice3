@@ -1,8 +1,15 @@
-torch
-torchaudio
-numpy
+# --- 基础工具库 ---
 modelscope
+huggingface_hub
 hyperpyyaml
 onnxruntime
-# 核心库：CosyVoice (包含 funasr 依赖)
+numpy
+
+# --- 核心算法库 ---
+# 注意：CosyVoice 3.0 需要从 GitHub 安装最新版
 git+https://github.com/FunAudioLLM/CosyVoice.git
+
+# --- ComfyUI 环境通常已自带以下库 ---
+# 为防止版本冲突或错误降级为 CPU 版本，建议将其注释
+# torch
+# torchaudio
